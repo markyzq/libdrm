@@ -39,6 +39,9 @@ dristat_LDADD = -lm
 if HAVE_NOUVEAU
 SUBDIRS += nouveau
 endif
+if HAVE_LIBKMS
+SUBDIRS += kmstest modetest planetest
+endif
 
 TESTS = \
 	drmsl \

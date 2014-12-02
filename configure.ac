@@ -507,6 +507,7 @@ AC_CONFIG_FILES([
 	tests/exynos/Makefile
 	tests/tegra/Makefile
 	tests/nouveau/Makefile
+	tests/planetest/Makefile
 	man/Makefile
 	libdrm.pc])
 AC_OUTPUT
