@@ -17,6 +17,12 @@
 #include "modeset.h"
 
 static int terminate = 0;
+struct plane_inc {
+	int x_inc;
+	int y_inc;
+	int x;
+	int y;
+};
 
 static void sigint_handler(int arg)
 {
@@ -35,11 +41,11 @@ static void incrementor(int *inc, int *val, int increment, int lower, int upper)
 int main(int argc, char *argv[])
 {
 	int ret, i, j, num_test_planes;
-	int x_inc = 1, x = 0, y_inc = 1, y = 0;
 	uint32_t plane_w = 128, plane_h = 128;
 	struct sp_dev *dev;
 	struct sp_plane **plane = NULL;
 	struct sp_crtc *test_crtc;
+	struct plane_inc **inc = NULL;
 
 	signal(SIGINT, sigint_handler);
 
@@ -78,18 +84,40 @@ int main(int argc, char *argv[])
 			goto out;
 		}
 
-		fill_bo(plane[i]->bo, 0xFF, 0xFF, 0xFF, 0xFF);
+		if (i == 0)
+			fill_bo(plane[i]->bo, 0xFF, 0xFF, 0xFF, 0xFF);
+		else if (i == 1)
+			fill_bo(plane[i]->bo, 0xFF, 0x00, 0xFF, 0xFF);
+		else if (i == 2)
+			fill_bo(plane[i]->bo, 0xFF, 0x00, 0x00, 0xFF);
+		else if (i == 3)
+			fill_bo(plane[i]->bo, 0xFF, 0xFF, 0x00, 0x00);
+		else
+			fill_bo(plane[i]->bo, 0xFF, 0x00, 0xFF, 0x00);
+	}
+
+	inc = calloc(num_test_planes, sizeof(*inc));
+	for (j = 0; j < num_test_planes; j++) {
+		inc[j] = calloc(1, sizeof(*inc));
+		inc[j]->x_inc = 0;
+		inc[j]->y_inc = 0;
+		inc[j]->x = 0;
+		inc[j]->y = 0;
 	}
 
 	while (!terminate) {
-		incrementor(&x_inc, &x, 5, 0,
-			test_crtc->crtc->mode.hdisplay - plane_w);
-		incrementor(&y_inc, &y, 5, 0, test_crtc->crtc->mode.vdisplay -
-						plane_h * num_test_planes);
-
 		for (j = 0; j < num_test_planes; j++) {
+			incrementor(&inc[j]->x_inc, &inc[j]->x, 5 + j, 0,
+				    test_crtc->crtc->mode.hdisplay - plane_w);
+			incrementor(&inc[j]->y_inc, &inc[j]->y, 5 + j * 5, 0,
+				    test_crtc->crtc->mode.vdisplay - plane_h);
+			if (inc[j]->x + plane_w > test_crtc->crtc->mode.hdisplay)
+				inc[j]->x = test_crtc->crtc->mode.hdisplay - plane_w;
+			if (inc[j]->y + plane_h > test_crtc->crtc->mode.vdisplay)
+				inc[j]->y = test_crtc->crtc->mode.vdisplay - plane_h;
+
 			ret = set_sp_plane(dev, plane[j], test_crtc,
-					x, y + j * plane_h);
+					   inc[j]->x, inc[j]->y);
 			if (ret) {
 				printf("failed to set plane %d %d\n", j, ret);
 				goto out;
@@ -98,11 +126,14 @@ int main(int argc, char *argv[])
 		usleep(15 * 1000);
 	}
 
-	for (i = 0; i < num_test_planes; i++)
+	for (i = 0; i < num_test_planes; i++) {
 		put_sp_plane(plane[i]);
+		free(inc[i]);
+	}
 
 out:
 	destroy_sp_dev(dev);
 	free(plane);
+	free(inc);
 	return ret;
 }
