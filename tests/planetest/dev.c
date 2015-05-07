@@ -69,6 +69,13 @@ struct sp_dev *create_sp_dev(void)
 	}
 
 	dev->fd = fd;
+
+	ret = drmSetClientCap(dev->fd, DRM_CLIENT_CAP_ATOMIC, 1);
+	if (ret) {
+		printf("failed to set client cap atomic\n");
+		goto err;
+	}
+
 	ret = drmSetClientCap(dev->fd, DRM_CLIENT_CAP_UNIVERSAL_PLANES, 1);
 	if (ret) {
 		printf("failed to set client cap\n");
