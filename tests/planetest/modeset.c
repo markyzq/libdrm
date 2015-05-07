@@ -41,8 +41,17 @@ int initialize_screens(struct sp_dev *dev)
 		}
 
 		if (!c->encoder_id) {
-			printf("no encoder attached to the connector\n");
-			continue;
+			/*
+			 * default drm encoder not attached connector, just
+			 * select the first one.
+			 */
+			if (dev->num_encoders) {
+				e = dev->encoders[0];
+				c->encoder_id = e->encoder_id;
+			} else {
+				printf("no encoder attached to the connector\n");
+				continue;
+			}
 		}
 
 		for (j = 0; j < dev->num_encoders; j++) {
@@ -56,9 +65,19 @@ int initialize_screens(struct sp_dev *dev)
 		}
 
 		if (!e->crtc_id) {
-			printf("no crtc attached to the encoder\n");
-			continue;
+			/*
+			 * default drm crtc not attached encoder, just
+			 * select the first one.
+			 */
+			if (dev->num_crtcs) {
+				cr = &dev->crtcs[j];
+				e->crtc_id = cr->crtc->crtc_id;
+			} else {
+				printf("no crtc attached to the encoder\n");
+				continue;
+			}
 		}
+
 		for (j = 0; j < dev->num_crtcs; j++) {
 			cr = &dev->crtcs[j];
 
@@ -91,6 +110,13 @@ int initialize_screens(struct sp_dev *dev)
 			printf("failed to set crtc mode ret=%d\n", ret);
 			continue;
 		}
+		cr->crtc = drmModeGetCrtc(dev->fd, cr->crtc->crtc_id);
+		/*
+		 * Todo:
+		 * I don't know why crtc mode is empty, just copy PREFERRED mode
+		 * for it.
+		 */
+		memcpy(&cr->crtc->mode, m, sizeof(*m));
 	}
 	return 0;
 }
