@@ -27,6 +27,7 @@ static void
 page_flip_handler(int fd, unsigned int sequence, unsigned int tv_sec,
 		unsigned int tv_usec, void *user_data)
 {
+		printf("---->yzq %s %d \n", __func__,__LINE__);
 }
 
 static void incrementor(int *inc, int *val, int increment, int lower, int upper)
@@ -46,8 +47,7 @@ int main(int argc, char *argv[])
 	struct sp_dev *dev;
 	struct sp_plane **plane = NULL;
 	struct sp_crtc *test_crtc;
-	fd_set fds;
-	drmModePropertySetPtr pset;
+	drmModeAtomicReqPtr pset;
 	drmEventContext event_context = {
 		.version = DRM_EVENT_CONTEXT_VERSION,
 		.page_flip_handler = page_flip_handler,
@@ -93,46 +93,49 @@ int main(int argc, char *argv[])
 		fill_bo(plane[i]->bo, 0xFF, 0xFF, 0xFF, 0xFF);
 	}
 
-	pset = drmModePropertySetAlloc();
-	if (!pset) {
-		printf("Failed to allocate the property set\n");
-		goto out;
-	}
-
+	printf("display size=%dx%d\n", test_crtc->crtc->mode.hdisplay, test_crtc->crtc->mode.vdisplay);
 	while (!terminate) {
-		FD_ZERO(&fds);
-		FD_SET(dev->fd, &fds);
+		struct timeval timeout = { .tv_sec = 3, .tv_usec = 0 };
+		fd_set fds;
 
 		incrementor(&x_inc, &x, 5, 0,
 			test_crtc->crtc->mode.hdisplay - plane_w);
 		incrementor(&y_inc, &y, 5, 0, test_crtc->crtc->mode.vdisplay -
 						plane_h * num_test_planes);
 
-		for (j = 0; j < num_test_planes; j++) {
-			ret = set_sp_plane_pset(dev, plane[j], pset, test_crtc,
-					x, y + j * plane_h);
-			if (ret) {
-				printf("failed to move plane %d\n", ret);
-				goto out;
-			}
+		pset = drmModeAtomicAlloc();
+		if (!pset) {
+			printf("Failed to allocate the property set\n");
+			goto out;
 		}
 
-		ret = drmModePropertySetCommit(dev->fd,
-				DRM_MODE_PAGE_FLIP_EVENT, NULL, pset);
+		for (j = 0; j < num_test_planes; j++) {
+			set_sp_plane_pset(dev, plane[j], pset, test_crtc,
+					x, y + j * (plane_h + 10) );
+		}
+
+		ret = drmModeAtomicCommit(dev->fd, pset,
+				DRM_MODE_PAGE_FLIP_EVENT, NULL);
 		if (ret) {
 			printf("failed to commit properties ret=%d\n", ret);
 			goto out;
 		}
 
-		do {
-			ret = select(dev->fd + 1, &fds, NULL, NULL, NULL);
-		} while (ret == -1 && errno == EINTR);
+		drmModeAtomicFree(pset);
 
-		if (FD_ISSET(dev->fd, &fds))
+		FD_ZERO(&fds);
+		FD_SET(0, &fds);
+		FD_SET(dev->fd, &fds);
+		ret = select(dev->fd + 1, &fds, NULL, NULL, &timeout);
+
+		if (ret <= 0) {
+			fprintf(stderr, "select timed out or error (ret %d)\n",
+				ret);
+			continue;
+		} else if (FD_ISSET(0, &fds)) {
 			drmHandleEvent(dev->fd, &event_context);
+		}
 	}
-
-	drmModePropertySetFree(pset);
 
 	for (i = 0; i < num_test_planes; i++)
 		put_sp_plane(plane[i]);
