@@ -187,13 +187,13 @@ int set_sp_plane(struct sp_dev *dev, struct sp_plane *plane,
 }
 #ifdef USE_ATOMIC_API
 int set_sp_plane_pset(struct sp_dev *dev, struct sp_plane *plane,
-		drmModeAtomicReqPtr pset, struct sp_crtc *crtc, int x, int y)
+		drmModeAtomicReqPtr pset, struct sp_crtc *crtc, int x, int y, int w, int h)
 {
 	int ret;
-	uint32_t w, h;
+	int src_w, src_h;
 
-	w = plane->bo->width;
-	h = plane->bo->height;
+	src_w = plane->bo->width;
+	src_h = plane->bo->height;
 
 	if ((w + x) > crtc->crtc->mode.hdisplay)
 		w = crtc->crtc->mode.hdisplay - x;
@@ -201,24 +201,15 @@ int set_sp_plane_pset(struct sp_dev *dev, struct sp_plane *plane,
 		h = crtc->crtc->mode.vdisplay - y;
 
 	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->crtc_pid, crtc->crtc->crtc_id);
-	drmModeAtomicAddProperty(pset, plane->plane->plane_id,
-			plane->fb_pid, plane->bo->fb_id);
-	drmModeAtomicAddProperty(pset, plane->plane->plane_id,
-			plane->crtc_x_pid, x);
-	drmModeAtomicAddProperty(pset, plane->plane->plane_id,
-			plane->crtc_y_pid, y);
-	drmModeAtomicAddProperty(pset, plane->plane->plane_id,
-			plane->crtc_w_pid, w);
-	drmModeAtomicAddProperty(pset, plane->plane->plane_id,
-			plane->crtc_h_pid, h);
-	drmModeAtomicAddProperty(pset, plane->plane->plane_id,
-			plane->src_x_pid, 0);
-	drmModeAtomicAddProperty(pset, plane->plane->plane_id,
-			plane->src_y_pid, 0);
-	drmModeAtomicAddProperty(pset, plane->plane->plane_id,
-			plane->src_w_pid, w << 16);
-	drmModeAtomicAddProperty(pset, plane->plane->plane_id,
-			plane->src_h_pid, h << 16);
+	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->fb_pid, plane->bo->fb_id);
+	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->crtc_x_pid, x);
+	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->crtc_y_pid, y);
+	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->crtc_w_pid, w);
+	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->crtc_h_pid, h);
+	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->src_x_pid, 0);
+	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->src_y_pid, 0);
+	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->src_w_pid, src_w << 16);
+	drmModeAtomicAddProperty(pset, plane->plane->plane_id, plane->src_h_pid, src_h << 16);
 
 	return ret;
 }
